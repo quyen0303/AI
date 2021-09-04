@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<language>
+	<romanian>
+		<restart> "R" pentru reîncepere </restart>
+		<resign> "S" pentru a renunța </resign>
+		<undo> "Z" pentru undo </undo>
+		<aivai> Vizualizează meci AI vs AI </aivai>
+		<whitevsai> Joacă vs AI (Alb) </whitevsai>
+		<blackvsai> Joacă vs AI (Negru) </blackvsai>
+		<practice> Exersare </practice>
+		<aivsai2> Vizualizează AI 2 vs AI 2 </aivsai2>
+		<whitevsai2> Joacă vs AI puternic (Alb) </whitevsai2>
+		<menutext> Meniu principal </menutext>
+		<draw> Egal prin repetiții </draw>
+		<whitewin> Alb câștigă prin mat </whitewin>
+		<blackwin> Negru câștigă prin mat </blackwin>
+		<stalemate> Pat </stalemate>
+		<humanresign> Jucătorul uman a renunțat </humanresign>
+		<enginetext> Evaluare mișcări </enginetext>
+		<whiteresign> Alb renunță </whiteresign>
+		<blackresign> Negru renunță </blackresign>
+		<agreement> Egal prin înţelegere </agreement>
+	</romanian>
+	<english>
+		<restart> "R" to restart </restart>
+		<resign> "S" to resign </resign>
+		<undo> "Z" to undo </undo>
+		<aivai> Watch AI vs AI Game </aivai>
+		<whitevsai> Play vs AI (White) </whitevsai>
+		<blackvsai> Play vs AI (Black) </blackvsai>
+		<practice> Practice </practice>
+		<aivsai2> Watch AI 2 vs AI 2 Game </aivsai2>
+		<whitevsai2> Play vs Strong AI (White) </whitevsai2>
+		<menutext> Main menu </menutext>
+		<draw> Draw by repetition </draw>
+		<whitewin> White wins by checkmate </whitewin>
+		<blackwin> Black wins by checkmate </blackwin>
+		<stalemate> Stalemate </stalemate>
+		<humanresign> Human player resigned </humanresign>
+		<enginetext> Evaluate moves </enginetext>
+		<whiteresign> White resigned </whiteresign>
+		<blackresign> Black resigned </blackresign>
+		<agreement> Draw by agreement </agreement>
+	</english>
+	<german>
+		<restart> "R" für neu starten </restart>
+		<resign> "S" für aufgeben </resign>
+		<undo> "Z" rückgangig machen </undo>
+		<aivai> Spiel KI vs KI ansehen </aivai>
+		<whitevsai> Spiel vs KI (Weiß) </whitevsai>
+		<blackvsai> Spiel vs KI (Schwarz) </blackvsai>
+		<practice> Trainieren </practice>
+		<aivsai2> Spiel stark KI vs stark KI ansehen </aivsai2>
+		<whitevsai2> Spiel vs stark KI (Weiß) </whitevsai2>
+		<menutext> Hauptmenü </menutext>
+		<draw> Unentschieden Durch Wiederholung </draw>
+		<whitewin> Weiß gewinnt durch Schachmatt </whitewin>
+		<blackwin> Schwarz gewinnt durch Schachmatt </blackwin>
+		<stalemate> Patt </stalemate>
+		<humanresign> Menschlicher Spieler aufgegebt </humanresign>
+		<enginetext> Bewegungen bewerten </enginetext>
+		<whiteresign> Weiß aufgegebt </whiteresign>
+		<blackresign> Schwarz aufgegebt </blackresign>
+		<agreement> nach Vereinbarung zeichnen</agreement>
+	</german>
+	<russian>
+		<restart> "R" для перезапуска </restart>
+		<resign> "S" уйти в отставку </resign>
+		<undo> "Z" переделать </undo>
+		<aivai> смотреть игру AI vs AI </aivai>
+		<whitevsai> играть против AI (белый) </whitevsai>
+		<blackvsai> играть против AI (черный) </blackvsai>
+		<practice> упражняться </practice>
+		<aivsai2> смотреть игру AI 2 vs AI 2 </aivsai2>
+		<whitevsai2> играть против AI 2 (белый) </whitevsai2>
+		<menutext> главное меню </menutext>
+		<draw> рисовать повторением </draw>
+		<whitewin> белые выигрывают матом </whitewin>
+		<blackwin> черные выигрывают матом </blackwin>
+		<stalemate> безвыходное положение </stalemate>
+		<humanresign> игрок-человек ушел в отставку </humanresign>
+		<enginetext> оценивать ходы </enginetext>
+		<whiteresign> белый подал в отставку </whiteresign>
+		<blackresign> черный ушел в отставку </blackresign>
+		<agreement> рисовать по договоренности </agreement>
+	</russian>
+</language>
+	
