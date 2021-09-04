@@ -1,3 +1,4 @@
+import os
 import pygame as p
 
 class GameState():
@@ -169,14 +170,14 @@ class GameState():
                 self.checkMate = True
 
                 if self.play == 0:
-                    checkmateSound = p.mixer.Sound("images/ChessCheckmateSound.mp3")
+                    checkmateSound = p.mixer.Sound(os.path.join(os.path.dirname(os.path.dirname(__file__)), "images/ChessCheckmateSound.mp3"))
                     checkmateSound.play()
                     self.play = 1
 
             else:
                 self.staleMate = True
                 if self.play == 0:
-                    drawSound = p.mixer.Sound("images/ChessDrawSound.mp3")
+                    drawSound = p.mixer.Sound(os.path.join(os.path.dirname(os.path.dirname(__file__)), "images/ChessDrawSound.mp3"))
                     drawSound.play()
                     self.play = 1
         else:
@@ -380,7 +381,7 @@ class Move():
 
         if self.isCastleMove:
             if self.play == 0:
-                castleSound = p.mixer.Sound("images/ChessCastleSound.mp3")
+                castleSound = p.mixer.Sound(os.path.join(os.path.dirname(os.path.dirname(__file__)), "images/ChessCastleSound.mp3"))
                 castleSound.play()
                 self.play = 1
             if self.endCol > self.startCol:
@@ -396,7 +397,7 @@ class Move():
                 outString += self.getRankFile(self.startRow, self.startCol)[0] + "x" + self.getRankFile(
                     self.endRow, self.endCol)
             if self.play == 0:
-                captureSound = p.mixer.Sound("images/ChessCaptureSound.mp3")
+                captureSound = p.mixer.Sound(r"images/ChessCaptureSound.mp3")
                 captureSound.play()
                 self.play = 1
             else:

@@ -1,11 +1,13 @@
 import pygame as p
-import ChessController
+import os
+from core import ChessController
+
 
 def main(language, subscribed):
 
     controller = ChessController.ChessController()
-    playSound = p.mixer.Sound("images/menucut.mp3")
-    playSound.play()
+    play_sound = p.mixer.Sound(r"images//menucut.mp3")
+    play_sound.play()
     controller.playGame(language, subscribed)
 
 if __name__ == "__main__":

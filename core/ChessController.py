@@ -1,4 +1,5 @@
-import ChessView, ChessEngine, ChessAI, ChessMain, ChessObserver
+import os
+from core import ChessAI, ChessEngine, ChessMain, ChessView, ChessObserver
 import pygame as p
 import tkinter as tk
 from tkinter import filedialog
@@ -122,7 +123,8 @@ class ChessController():
         animate = False
         AI = ChessAI.ChessAI(depth)
         AI()
-        playSound = p.mixer.Sound("images/ChessOpeningSound.mp3")
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        playSound = p.mixer.Sound(r"images/ChessOpeningSound.mp3")
         playSound.play()
         p.mixer.init()
         gs = self.chessModel
@@ -184,7 +186,7 @@ class ChessController():
                                 if move == validMoves[i]:
                                     gs.makeMove(validMoves[i])
                                     moveMade = True
-                                    moveSound = p.mixer.Sound("images/ChessMoveSound.mp3")
+                                    moveSound = p.mixer.Sound(r"images/ChessMoveSound.mp3")
                                     moveSound.play()
                                     animate = True
                                     selected = ()
@@ -250,7 +252,7 @@ class ChessController():
                             humanTurn = True
 
                         p.mixer.init()
-                        moveSound = p.mixer.Sound("images/ChessMoveSound.mp3")
+                        moveSound = p.mixer.Sound(r"images/ChessMoveSound.mp3")
                         moveSound.play()
 
                         moveMade = True
@@ -259,7 +261,7 @@ class ChessController():
                             animate = True
 
                 import xml.etree.ElementTree as ET
-                mytree = ET.parse("display.xml")
+                mytree = ET.parse(r"core/display.xml")
                 myroot = mytree.getroot()
 
                 for x in myroot.findall(language):
@@ -341,7 +343,7 @@ class ChessController():
                 elif repetitionDraw:
                     view.drawText(drawText)
                     if play == 0:
-                        drawSound = p.mixer.Sound("images/ChessDrawSound.mp3")
+                        drawSound = p.mixer.Sound(r"images/ChessDrawSound.mp3")
                         drawSound.play()
                         play = 1
 
@@ -349,7 +351,7 @@ class ChessController():
                     gameOver = True
                     view.drawText(humanResignText)
                     if play == 0:
-                        drawSound = p.mixer.Sound("images/ChessDrawSound.mp3")
+                        drawSound = p.mixer.Sound(r"images/ChessDrawSound.mp3")
                         drawSound.play()
                         play = 1
 
@@ -362,7 +364,7 @@ class ChessController():
                     if self.checkStringInFile(file, "0-1"):
                          view.drawText(whiteResignText)
                     if play == 0:
-                        drawSound = p.mixer.Sound("images/ChessDrawSound.mp3")
+                        drawSound = p.mixer.Sound(r"images/ChessDrawSound.mp3")
                         drawSound.play()
                         play = 1
                         

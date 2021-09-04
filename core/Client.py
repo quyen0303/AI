@@ -1,5 +1,5 @@
 import socket
-import ChessController
+from core import ChessController
 import pygame as p
 import threading
 from abc import ABCMeta
@@ -53,7 +53,7 @@ class Client(IClient):
 
     def playChess(self, language, subscribed):
         controller = ChessController.ChessController()
-        playSound = p.mixer.Sound("images/menucut.mp3")
+        playSound = p.mixer.Sound(r"images/menucut.mp3")
         playSound.play()
         controller.playGame(language, subscribed)
 
@@ -89,7 +89,7 @@ class ProxyClient(IClient):
 
     def __init__(self):
         self.Client = Client()
-        file = open("client_chat.txt", "r+")
+        file = open(r"core/client_chat.txt", "r+")
         file.truncate(0)
         file.close()
 
@@ -97,7 +97,7 @@ class ProxyClient(IClient):
         self.Client.send()
 
     def playChess(self, language, subscribed):
-        f = open("client_chat.txt", "a")
+        f = open(r"core/client_chat.txt", "a")
         f.write("opened chess app proxy" + " %s \n" % (datetime.datetime.now()))
         f.close()
         self.Client.playChess(language, subscribed)
@@ -105,7 +105,7 @@ class ProxyClient(IClient):
     def write(self):
         while True:
             message = '{}: {}'.format(self.Client.nickname, input(''))
-            f = open("client_chat.txt", "a")
+            f = open(r"core/client_chat.txt", "a")
             f.write(message + " %s \n" % (datetime.datetime.now()))
             f.close()
             self.Client.client.send(message.encode('ascii'))

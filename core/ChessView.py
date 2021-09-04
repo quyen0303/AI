@@ -1,3 +1,5 @@
+import os
+
 import pygame as p
 import sys
 from pygame.locals import *
@@ -27,8 +29,8 @@ class ChessView():
                         "buttonSubscribe": p.Rect(466, 130, 40, 40),
                         "buttonImport": p.Rect(466, 190, 40, 40)}
         self.mainClock = p.time.Clock()
-        self.font = p.font.SysFont('couriernew', 15)
-        programIcon = p.image.load('images/mychesslogo.png')
+        self.font = p.font.SysFont(r'couriernew', 15)
+        programIcon = p.image.load(r'images/mychesslogo.png')
         p.display.set_icon(programIcon)
 
     def loadBoard(self):
@@ -63,7 +65,7 @@ class ChessView():
     def saveGame(self, movesList):
         result = movesList.pop()
         turnDictionary = {}
-        file = open("last_game_logs.txt", "w")
+        file = open(r"core/last_game_logs.txt", "w")
         for i in range(0, len(movesList)):
             try:
                 if int(movesList[i][1]) not in turnDictionary:
@@ -90,7 +92,7 @@ class ChessView():
                 p.draw.rect(self.screen, p.Color(119, 148, 85), self.buttons[button])
 
             import xml.etree.ElementTree as ET
-            mytree = ET.parse("display.xml")
+            mytree = ET.parse(r"core//display.xml")
             myroot = mytree.getroot()
 
             k = 2
@@ -123,12 +125,13 @@ class ChessView():
                             self.drawMenuText(i.text, p.Color("black"), 56 + (abs(512 - textObject.get_width()))/ 2, 56/2 + 60 * k)
                             k = k + 1
 
-            self.screen.blit(p.image.load(r'images/romaniabutton.png'), (60, 20, 20, 40))
-            self.screen.blit(p.image.load(r'images/ukflag.png'), (120, 20, 80, 40))
-            self.screen.blit(p.image.load(r'images/germanyflag.png'), (60, 70, 40, 40))
-            self.screen.blit(p.image.load(r'images/rusflag.png'), (120, 70, 40, 40))
-            self.screen.blit(p.image.load(r'images/chessengine.png'), (466, 130, 40, 40))
-            self.screen.blit(p.image.load(r'images/importchessgame.png'), (466, 190, 40, 40))
+            project_root = os.path.dirname(os.path.dirname(__file__))
+            self.screen.blit(p.image.load(r"images/romaniabutton.png"), (60, 20, 20, 40))
+            self.screen.blit(p.image.load(r"images/ukflag.png"), (120, 20, 80, 40))
+            self.screen.blit(p.image.load(r"images/germanyflag.png"), (60, 70, 40, 40))
+            self.screen.blit(p.image.load(r"images/rusflag.png"), (120, 70, 40, 40))
+            self.screen.blit(p.image.load(r"images/chessengine.png"), (466, 130, 40, 40))
+            self.screen.blit(p.image.load(r"images/importchessgame.png"), (466, 190, 40, 40))
 
             self.click = False
             for event in p.event.get():
