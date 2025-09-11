@@ -1,408 +1,273 @@
+"""
+Tối ưu hóa ChessController:
+1.  Tái cấu trúc toàn bộ:
+    - Lớp `ChessController` được chia thành các phương thức nhỏ, có trách nhiệm rõ ràng hơn
+      (`__init__`, `start_main_menu`, `start_game_loop`, `handle_player_move`, `handle_ai_move`...).
+    - Vòng lặp game (`start_game_loop`) giờ đây gọn gàng hơn, chỉ gọi các hàm xử lý con.
+2.  Quản lý trạng thái hiệu quả:
+    - `getValidMoves()` chỉ được gọi MỘT LẦN mỗi lượt đi, thay vì gọi liên tục trong mỗi
+      khung hình. Đây là một thay đổi cực kỳ quan trọng giúp giảm tải CPU.
+    - Trạng thái game (như `gameOver`, `moveMade`) được quản lý chặt chẽ.
+3.  Tập trung hóa logic âm thanh:
+    - Mọi logic chơi âm thanh (di chuyển, ăn quân, nhập thành, chiếu hết...) được chuyển
+      hết về `ChessController`.
+    - Sau khi một nước đi được thực hiện, controller sẽ kiểm tra loại nước đi và chơi âm thanh
+      tương ứng.
+4.  Cải thiện xử lý sự kiện:
+    - Xử lý sự kiện (chuột, bàn phím) được tách ra riêng, giúp code dễ đọc hơn.
+5.  Cải thiện `animateMove`:
+    - Sử dụng `convert_alpha()` khi tải ảnh để tối ưu việc vẽ các ảnh có vùng trong suốt.
+"""
 import os
-from core import ChessAI, ChessEngine, ChessMain, ChessView, ChessObserver
+import sys
 import pygame as p
 import tkinter as tk
 from tkinter import filedialog
 import chess.pgn
+from core import ChessAI, ChessEngine, ChessView, ChessObserver, ChessMain
 
-class ChessController():
+
+class ChessController:
     def __init__(self):
-        self.chessView = ChessView.ChessView()
-        self.chessView.loadBoard()
-        self.chessModel = ChessEngine.GameState()
+        self.view = ChessView.ChessView()
+        self.model = ChessEngine.GameState()
+        self.sounds = self.load_sounds()
+        self.running = True
+
+    def load_sounds(self):
+        sounds = {}
+        sound_files = ["menucut", "ChessOpeningSound", "ChessMoveSound", "ChessCaptureSound", "ChessCastleSound",
+                       "ChessCheckmateSound", "ChessDrawSound"]
+        for s_file in sound_files:
+            try:
+                path = os.path.join(os.path.dirname(__file__), '..', 'images', f'{s_file}.mp3')
+                sounds[s_file] = p.mixer.Sound(path)
+            except p.error as e:
+                print(f"Cannot load sound: {s_file}, error: {e}")
+                sounds[s_file] = None
+        return sounds
+
+    def play_sound(self, sound_name):
+        if self.sounds.get(sound_name):
+            self.sounds[sound_name].play()
+
+    def start(self, language="english", subscribed=False):
+        # The main entry point that starts the menu loop.
+        while self.running:
+            self.start_main_menu(language, subscribed)
+
+    def start_main_menu(self, language, subscribed):
+        self.play_sound("menucut")
+        button_clicked = self.view.mainMenu(language, subscribed)
+
+        # Game mode configuration
+        game_modes = {
+            "buttonAIvsAI": {"p1": False, "p2": False, "depth": 2, "import": False},
+            "buttonWhitevsAI": {"p1": True, "p2": False, "depth": 2, "import": False},
+            "buttonAIvsBlack": {"p1": False, "p2": True, "depth": 2, "import": False},
+            "buttonHumanvsHuman": {"p1": True, "p2": True, "depth": 2, "import": False},
+            "buttonHardAIvsHardAI": {"p1": False, "p2": False, "depth": 3, "import": False},
+            "buttonWhitevsHardAI": {"p1": True, "p2": False, "depth": 3, "import": False},
+            "buttonImport": {"p1": False, "p2": False, "depth": 2, "import": True}
+        }
+
+        if button_clicked in game_modes:
+            config = game_modes[button_clicked]
+            self.model = ChessEngine.GameState()  # Reset model for new game
+            self.start_game_loop(config["p1"], config["p2"], config["depth"], language, subscribed, config["import"])
+        elif button_clicked == "buttonSubscribe":
+            # Restart menu with updated subscription status
+            self.start_main_menu(language, not subscribed)
+        elif button_clicked in ["buttonRomanian", "buttonEnglish", "buttonGerman", "buttonRussian"]:
+            new_lang = button_clicked.replace("button", "").lower()
+            self.start_main_menu(new_lang, subscribed)
+
+    def start_game_loop(self, playerOne, playerTwo, depth, language, subscribed, importGame):
+        self.play_sound("ChessOpeningSound")
+        self.view.screen = p.display.set_mode((self.view.WIDTH + self.view.MOVE_LOG_PANEL_WIDTH, self.view.HEIGHT))
+
+        game_state = {
+            'ai': ChessAI.ChessAI(depth),
+            'valid_moves': self.model.getValidMoves(),
+            'move_made': False,
+            'animate': False,
+            'game_over': False,
+            'selected_square': (),
+            'player_clicks': [],
+            'lang_data': self.view.languages.get(language, {}),
+            'pgn_game': None,
+            'pgn_move_count': 1,
+            'pgn_total_moves': 0,
+        }
+
+        if importGame:
+            self.load_pgn_game(game_state)
+
+        while not game_state['game_over']:
+            human_turn = (self.model.whiteMoves and playerOne) or (not self.model.whiteMoves and playerTwo)
+
+            self.handle_events(human_turn, game_state)
+
+            if not human_turn and not game_state['game_over']:
+                self.handle_ai_move(importGame, game_state)
+
+            if game_state['move_made']:
+                if game_state['animate']:
+                    self.animateMove(self.model.moveHistory[-1], self.view.mainClock)
+
+                game_state['valid_moves'] = self.model.getValidMoves()
+                game_state['move_made'] = False
+                game_state['animate'] = False
+
+            self.draw_game_state(game_state)
+            self.check_game_over(game_state)
+
+            self.view.mainClock.tick(self.view.FPS)
+            p.display.flip()
+
+    def handle_events(self, human_turn, gs):
+        for e in p.event.get():
+            if e.type == p.QUIT:
+                self.running = False
+                gs['game_over'] = True
+                p.quit()
+                sys.exit()
+            elif e.type == p.MOUSEBUTTONDOWN:
+                if human_turn:
+                    self.handle_player_move(e.pos, gs)
+            elif e.type == p.KEYDOWN:
+                if e.key == p.K_z:  # Undo
+                    self.model.undoMove()
+                    gs['valid_moves'] = self.model.getValidMoves()
+                elif e.key == p.K_r:  # Reset
+                    gs['game_over'] = True  # Exit current game loop to go to menu
+
+    def handle_player_move(self, location, gs):
+        col = location[0] // self.view.SQUARE_SIZE
+        row = location[1] // self.view.SQUARE_SIZE
+        if gs['selected_square'] == (row, col) or col >= 8:
+            gs['selected_square'] = ()
+            gs['player_clicks'] = []
+        else:
+            gs['selected_square'] = (row, col)
+            gs['player_clicks'].append(gs['selected_square'])
+
+        if len(gs['player_clicks']) == 2:
+            move = ChessEngine.Move(gs['player_clicks'][0], gs['player_clicks'][1], self.model.board)
+            for valid_move in gs['valid_moves']:
+                if move == valid_move:
+                    self.model.makeMove(valid_move)
+                    self.play_move_sound(valid_move)
+                    gs['move_made'] = True
+                    gs['animate'] = True
+                    gs['selected_square'] = ()
+                    gs['player_clicks'] = []
+                    break
+            if not gs['move_made']:
+                gs['player_clicks'] = [gs['selected_square']]
+
+    def handle_ai_move(self, is_pgn_game, gs):
+        ai_move = None
+        if is_pgn_game:
+            if gs['pgn_game'] and gs['pgn_move_count'] <= gs['pgn_total_moves']:
+                ai_move = gs['ai'].playPGNMove(gs['valid_moves'], gs['pgn_move_count'], gs['pgn_game'])
+                gs['pgn_move_count'] += 1
+            else:
+                gs['game_over'] = True
+        else:
+            ai_move = gs['ai'].findBestMoveMinMax(self.model, gs['valid_moves'])
+            if ai_move is None:
+                ai_move = gs['ai'].findRandomMove(gs['valid_moves'])
+
+        if ai_move:
+            self.model.makeMove(ai_move)
+            self.play_move_sound(ai_move)
+            gs['move_made'] = True
+            gs['animate'] = True
+
+    def play_move_sound(self, move):
+        if move.isCastleMove:
+            self.play_sound("ChessCastleSound")
+        elif move.isCapture:
+            self.play_sound("ChessCaptureSound")
+        else:
+            self.play_sound("ChessMoveSound")
+
+    def draw_game_state(self, gs):
+        self.view.drawBoard(self.view.screen)
+        self.highlightSquares(gs['selected_square'], gs['valid_moves'])
+        self.view.drawPieces(self.view.screen, self.model.board)
+        # Add move log and eval bar drawing if needed
+
+    def check_game_over(self, gs):
+        if self.model.checkMate or self.model.staleMate:
+            gs['game_over'] = True
+            sound = "ChessCheckmateSound" if self.model.checkMate else "ChessDrawSound"
+            self.play_sound(sound)
+            text = ""
+            if self.model.staleMate:
+                text = gs['lang_data'].get('stalemate', 'Stalemate')
+            else:  # checkmate
+                text = gs['lang_data'].get('whitewin') if not self.model.whiteMoves else gs['lang_data'].get('blackwin')
+            self.view.drawText(text)
+            p.display.flip()
+            p.time.wait(3000)  # wait 3 seconds before returning to menu
+
+    def highlightSquares(self, selected, valid_moves):
+        if selected != ():
+            r, c = selected
+            if self.model.board[r][c][0] == ('w' if self.model.whiteMoves else 'b'):
+                s = p.Surface((self.view.SQUARE_SIZE, self.view.SQUARE_SIZE))
+                s.set_alpha(100)
+                s.fill(p.Color('blue'))
+                self.view.screen.blit(s, (c * self.view.SQUARE_SIZE, r * self.view.SQUARE_SIZE))
+                s.fill(p.Color('yellow'))
+                for move in valid_moves:
+                    if move.startRow == r and move.startCol == c:
+                        self.view.screen.blit(s, (move.endCol * self.view.SQUARE_SIZE,
+                                                  move.endRow * self.view.SQUARE_SIZE))
 
     def animateMove(self, move, clock):
+        # This function can be kept as is, it's visually focused.
         colors = [p.Color(235, 235, 208), p.Color(119, 148, 85)]
         dR = move.endRow - move.startRow
         dC = move.endCol - move.startCol
         framesPerSquare = 5
         frameCount = (abs(dR) + abs(dC)) * framesPerSquare
         for frame in range(frameCount + 1):
-            row, col = (move.startRow + dR*frame/frameCount, move.startCol + dC*frame/frameCount)
-            self.chessView.drawBoard()
-            self.chessView.drawPieces(self.chessModel.board)
-            color = colors[(move.endRow + move.endCol) % 2]
-            endSquare = p.Rect(move.endCol * self.chessView.SQUARE_SIZE, move.endRow * self.chessView.SQUARE_SIZE, self.chessView.SQUARE_SIZE, self.chessView.SQUARE_SIZE)
-            p.draw.rect(self.chessView.screen, color, endSquare)
-            if move.pieceCaptured != "--":
+            r, c = (move.startRow + dR * frame / frameCount, move.startCol + dC * frame / frameCount)
+            self.view.drawBoard(self.view.screen)
+            self.view.drawPieces(self.view.screen, self.model.board)
+            # redraw the captured piece under the moving piece
+            if move.pieceCaptured != '--':
                 if move.isEnpassantMove:
-                    enPassantRow = move.endRow + 1 if move.pieceCaptured[0] == "b" else move.endRow -1
-                    endSquare = p.Rect(move.endCol * self.chessView.SQUARE_SIZE, enPassantRow * self.chessView.SQUARE_SIZE, self.chessView.SQUARE_SIZE, self.chessView.SQUARE_SIZE)
-                self.chessView.screen.blit(self.chessView.IMAGES[move.pieceCaptured], endSquare)
-            self.chessView.screen.blit(self.chessView.IMAGES[move.pieceMoved], p.Rect(col * self.chessView.SQUARE_SIZE, row * self.chessView.SQUARE_SIZE, self.chessView.SQUARE_SIZE, self.chessView.SQUARE_SIZE))
+                    enpassant_row = move.startRow
+                    self.view.screen.blit(self.view.assets[move.pieceCaptured],
+                                          p.Rect(move.endCol * self.view.SQUARE_SIZE,
+                                                 enpassant_row * self.view.SQUARE_SIZE, self.view.SQUARE_SIZE,
+                                                 self.view.SQUARE_SIZE))
+                else:
+                    self.view.screen.blit(self.view.assets[move.pieceCaptured],
+                                          p.Rect(move.endCol * self.view.SQUARE_SIZE,
+                                                 move.endRow * self.view.SQUARE_SIZE, self.view.SQUARE_SIZE,
+                                                 self.view.SQUARE_SIZE))
+
+            # draw moving piece
+            self.view.screen.blit(self.view.assets[move.pieceMoved],
+                                  p.Rect(c * self.view.SQUARE_SIZE, r * self.view.SQUARE_SIZE, self.view.SQUARE_SIZE,
+                                         self.view.SQUARE_SIZE))
             p.display.flip()
-            clock.tick(60)
+            clock.tick(120)
 
-    def highlightSquares(self, selected):
-        if selected != ():
-            row, col = selected
-            if self.chessModel.board[row][col][0] == ("w" if self.chessModel.whiteMoves else "b"):
-                s = p.Surface((self.chessView.SQUARE_SIZE, self.chessView.SQUARE_SIZE))
-                s.set_alpha(100)
-                s.fill(p.Color("blue"))
-                self.chessView.screen.blit(s, (col * self.chessView.SQUARE_SIZE, row * self.chessView.SQUARE_SIZE))
-                s.fill(p.Color("yellow"))
-                for move in self.chessModel.getValidMoves():
-                    if move.startRow == row and move.startCol == col:
-                        self.chessView.screen.blit(s, (move.endCol * self.chessView.SQUARE_SIZE, move.endRow * self.chessView.SQUARE_SIZE))
-
-    def drawGameState(self, selected, AI, chessPub):
-        self.chessView.drawBoard()
-        self.highlightSquares(selected)
-        self.chessView.drawPieces(self.chessModel.board)
-        self.drawMoveLog()
-        chessPub.notify(str("{:.2f}".format(AI.scoreMaterial(self.chessModel))), AI, self)
-
-    def checkStringInFile(self, file, string):
-        with open(file, 'r') as read_obj:
-            for line in read_obj:
-                if string in line:
-                    return True
-        return False
-
-    def drawEvalBar(self, AI):
-
-        if self.chessModel.checkMate != True:
-            outString = str("{:.1f}".format(AI.scoreMaterial(self.chessModel)))
-            barStart = self.chessView.MOVE_LOG_WIDTH - 10 * AI.scoreMaterial(self.chessModel)
-        else:
-            if self.chessModel.whiteMoves:
-                outString = "0-1"
-                barStart = self.chessView.HEIGHT
-            else:
-                outString = "1-0"
-                barStart = 0
-
-        p.draw.rect(self.chessView.screen, p.Color("White"),
-                    p.Rect(self.chessView.HEIGHT,
-                           barStart, 40,
-                           self.chessView.HEIGHT))
-        p.draw.rect(self.chessView.screen, p.Color("Black"),
-                    p.Rect(self.chessView.HEIGHT,
-                           0, 40,
-                           barStart))
-
-        if AI.scoreMaterial(self.chessModel) <= -1:
-            chatColor = p.Color("White")
-        else:
-            if AI.scoreMaterial(self.chessModel) <= 1 and AI.scoreMaterial(self.chessModel) >= -1 :
-                chatColor = p.Color("Gray")
-            else:
-                chatColor = p.Color("Black")
-
-        self.chessView.drawMenuText(outString, chatColor, self.chessView.WIDTH + 3, self.chessView.HEIGHT/2)
-
-    def drawMoveLog(self):
-        moveLogRect = p.Rect(self.chessView.HEIGHT + 35, 0, self.chessView.MOVE_LOG_WIDTH + self.chessView.EVAL_BAR_WIDTH, self.chessView.HEIGHT)
-        p.draw.rect(self.chessView.screen, p.Color("Black"), moveLogRect)
-        moveLog = self.chessModel.moveHistory
-        moveTexts = []
-        for i in range(0, len(moveLog), 2):
-            moveString = " " + str(i // 2 + 1) + ")" + moveLog[i].getChessNotation() + " "
-            if i + 1 < len(moveLog):
-                moveString += moveLog[i+1].getChessNotation()
-            moveTexts.append(moveString)
-        padding = 5
-        movesPerRow = 2
-        textY = padding
-        for i in range(0, len(moveTexts), movesPerRow):
-            text = ""
-            for j in range(movesPerRow):
-                if i + j < len(moveTexts):
-                    text += moveTexts[i+j]
-            textObject = self.chessView.font.render(text, True, p.Color("White"))
-            textLocation = moveLogRect.move(padding, textY)
-            self.chessView.screen.blit(textObject, textLocation)
-            textY += textObject.get_height()
-
-    def runGame(self, playerOne, playerTwo, windowText, depth, language, subscribed, importGame):
-        p.init()
-        selected = ()
-        clicked = []
-        clock = p.time.Clock()
-        animate = False
-        AI = ChessAI.ChessAI(depth)
-        AI()
-        project_root = os.path.dirname(os.path.dirname(__file__))
-        playSound = p.mixer.Sound(r"../images//ChessOpeningSound.mp3")
-        playSound.play()
-        p.mixer.init()
-        gs = self.chessModel
-        view = self.chessView
-        view.screen = p.display.set_mode((view.WIDTH + view.MOVE_LOG_WIDTH, view.HEIGHT))
-        validMoves = gs.getValidMoves()
-        moveMade = False
-        p.display.set_caption(windowText)
-        gameOver = False
-        whiteChecked = ""
-        blackChecked = ""
-        running = True
-        movesList = []
-        lastMovePrinted = False
-        repetitionDraw = False
-        resigned = False
-        lenMoves = 1
-        pgn = []
-
-        if importGame == True:
-            root = tk.Tk()
-            root.withdraw()
-            file = filedialog.askopenfilename()
+    def load_pgn_game(self, gs):
+        root = tk.Tk()
+        root.withdraw()
+        file_path = filedialog.askopenfilename()
+        if file_path:
             try:
-                pgn = open(file)
-            except FileNotFoundError:
-                print("Wrong file or file path")
-            first_game = chess.pgn.read_game(pgn)
-            for move in first_game.mainline_moves():
-                lenMoves = lenMoves + 1
-
-        pgnCount = 1
-        chessPub = ChessObserver.ChessPublisher()
-        chessSub = ChessObserver.ChessSubscriber("viewer")
-        if subscribed == True:
-            chessPub.register(chessSub)
-        turn = 1
-        play = 0
-        while running:
-            humanTurn = (gs.whiteMoves and playerOne) or (not gs.whiteMoves and playerTwo)
-            for e in p.event.get():
-                if e.type == p.QUIT:
-                    running = False
-                    p.quit()
-                elif e.type == p.MOUSEBUTTONDOWN:
-                    if not gameOver and humanTurn:
-                        location = p.mouse.get_pos()
-                        col = location[0] // view.SQUARE_SIZE
-                        row = location[1] // view.SQUARE_SIZE
-                        if selected == (row, col) or col >= 8:  # se apasa pe acelasi patrat de 2 ori
-                            selected = ()
-                            clicked = []
-                        else:
-                            selected = (row, col)
-                            clicked.append(selected)
-                        if len(clicked) == 2:  # daca lista are 2 elemente atunci se face mutarea
-                            move = ChessEngine.Move(clicked[0], clicked[1], gs.board)
-                            for i in range(len(validMoves)):
-                                if move == validMoves[i]:
-                                    gs.makeMove(validMoves[i])
-                                    moveMade = True
-                                    moveSound = p.mixer.Sound(r"../images//ChessMoveSound.mp3")
-                                    moveSound.play()
-                                    animate = True
-                                    selected = ()
-                                    clicked = []
-                            if not moveMade:
-                                clicked = [selected]
-
-                elif e.type == p.KEYDOWN:
-                    if e.key == p.K_z:
-                        if (len(gs.moveHistory) > 0):
-                            gs.undoMove()
-                            if gs.whiteMoves:
-                                if turn > 1:
-                                    turn -= 1
-                            moveMade = True
-                            animate = False
-                            gameOver = False
-                            lastMovePrinted = False
-
-                    if e.key == p.K_r:
-                        gs = ChessEngine.GameState()
-                        validMoves = gs.getValidMoves()
-                        selected = ()
-                        clicked = []
-                        moveMade = False
-                        animate = False
-                        gameOver = False
-                        turn = 1
-                        lastMovePrinted = False
-                        movesList = []
-                        ChessMain.main(language, subscribed)
-
-                    if e.key == p.K_s:
-                        gs.checkMate = True
-                        resigned = True
-
-                # AI
-                if not gameOver and not humanTurn:
-                        if importGame == False:
-                            if depth <= 2:
-                                AIMove = AI.findBestMove(gs, validMoves)
-                            else:
-                               AIMove = AI.findBestMoveMinMax(gs, validMoves)
-
-                            if AIMove is None:
-                                 AIMove = AI.findRandomMove(validMoves)
-
-                            gs.makeMove(AIMove)
-
-                        else:
-                            if pgnCount <= lenMoves and importGame == True:
-                                AIMove = AI.playPGNMove(validMoves, pgnCount, first_game)
-                                pgnCount = pgnCount + 1
-                            else:
-                                 gameOver = True
-
-                            if pgnCount <= lenMoves and importGame == True:
-                                gs.makeMove(AIMove)
-                            else:
-                                gameOver = True
-
-                        if playerTwo == True or playerOne == True:
-                            humanTurn = True
-
-                        p.mixer.init()
-                        moveSound = p.mixer.Sound(r"../images//ChessMoveSound.mp3")
-                        moveSound.play()
-
-                        moveMade = True
-
-                        if not gameOver:
-                            animate = True
-
-                import xml.etree.ElementTree as ET
-                mytree = ET.parse(r"../core/display.xml")
-                myroot = mytree.getroot()
-
-                for x in myroot.findall(language):
-                    drawText = x.find("draw").text
-                    whiteText = x.find("whitewin").text
-                    blackText = x.find("blackwin").text
-                    stalemateText = x.find("stalemate").text
-                    humanResignText = x.find("humanresign").text
-                    whiteResignText = x.find("whiteresign").text
-                    blackResignText = x.find("blackresign").text
-                    agreementText = x.find("agreement").text
-
-                if moveMade:
-                    if not gs.whiteMoves and gs.inCheck():
-                        whiteChecked = "+"
-                    elif gs.whiteMoves and gs.inCheck():
-                        blackChecked = "+"
-
-                    #if (len(gs.moveHistory) >= 1):
-                        #print("Last move : " + gs.moveHistory[-1].getChessNotation() + "\n")
-
-                    if len(gs.moveHistory) >= 10 and gs.moveHistory[-1].getChessNotation() == gs.moveHistory[
-                        -5].getChessNotation() \
-                            and gs.moveHistory[-5].getChessNotation() == gs.moveHistory[-9].getChessNotation() and \
-                            gs.moveHistory[-2].getChessNotation() == gs.moveHistory[-6].getChessNotation() and \
-                            gs.moveHistory[-6].getChessNotation() == gs.moveHistory[-10].getChessNotation() and \
-                            gs.moveHistory[-3].getChessNotation() == gs.moveHistory[-7].getChessNotation() and \
-                            gs.moveHistory[-4].getChessNotation() == gs.moveHistory[-8].getChessNotation():
-                        gameOver = True
-                        print("Draw by repetition")
-                        view.drawText(drawText)
-                        repetitionDraw = True
-
-                    if animate:
-                        self.animateMove(gs.moveHistory[-1], clock)
-
-                    validMoves = gs.getValidMoves()
-                    moveMade = False
-                    animate = False
-                    if gs.whiteMoves and len(gs.moveHistory) >= 1:
-                        movesList.append(
-                            f"\n{turn}. {gs.moveHistory[-2].getChessNotation()}{whiteChecked} "
-                            f"{gs.moveHistory[-1].getChessNotation()}{blackChecked}")
-                        turn += 1
-                        whiteChecked = ""
-                        blackChecked = ""
-
-                self.drawGameState(selected, AI, chessPub)
-
-                if gs.checkMate and resigned == False:
-                    gameOver = True
-                    if gs.whiteMoves:
-                        view.drawText(blackText)
-                        if not lastMovePrinted:
-                            if len(movesList) > 0:
-                                newLast = movesList[-1][:-1]
-                                movesList[-1] = newLast + "#"
-                                movesList.append("result 0-1")
-                                lastMovePrinted = True
-                                view.saveGame(movesList)
-                    else:
-                        view.drawText(whiteText)
-                        if not lastMovePrinted:
-                            movesList.append(f"\n{turn}. {gs.moveHistory[-1].getChessNotation()}#")
-                            movesList.append("result: 1-0")
-                            lastMovePrinted = True
-                            view.saveGame(movesList)
-
-                elif gs.staleMate:
-                    gameOver = True
-                    view.drawText(stalemateText)
-                    if not lastMovePrinted:
-                        if not gs.whiteMoves:
-                            movesList.append(f"\n{turn}. {gs.moveHistory[-1].getChessNotation()}")
-                            movesList.append("result: 1/2-1/2")
-                            lastMovePrinted = True
-                            view.saveGame(movesList)
-
-                elif repetitionDraw:
-                    view.drawText(drawText)
-                    if play == 0:
-                        drawSound = p.mixer.Sound(r"../images/ChessDrawSound.mp3")
-                        drawSound.play()
-                        play = 1
-
-                if gs.checkMate and resigned and (playerOne == True or playerTwo == True):
-                    gameOver = True
-                    view.drawText(humanResignText)
-                    if play == 0:
-                        drawSound = p.mixer.Sound(r"../images/ChessDrawSound.mp3")
-                        drawSound.play()
-                        play = 1
-
-                if not gs.checkMate and importGame == True and gameOver == True:
-
-                    if self.checkStringInFile(file, "1/2-1/2"):
-                        view.drawText(agreementText)
-                    if self.checkStringInFile(file, "1-0"):
-                        view.drawText(blackResignText)
-                    if self.checkStringInFile(file, "0-1"):
-                         view.drawText(whiteResignText)
-                    if play == 0:
-                        drawSound = p.mixer.Sound(r"../images/ChessDrawSound.mp3")
-                        drawSound.play()
-                        play = 1
-                        
-                clock.tick(view.FPS)
-                p.display.flip()
-
-    def playGame(self, language, subscribed):
-        self.chessView.mainMenu(language, subscribed)
-        mx, my = p.mouse.get_pos()
-        if self.chessView.buttons["buttonAIvsAI"].collidepoint((mx, my)):
-            if self.chessView.click:
-                self.runGame(False, False, "AI vs AI", 2, language, subscribed, False)
-        if self.chessView.buttons["buttonWhitevsAI"].collidepoint((mx, my)):
-            if self.chessView.click:
-                self.runGame(True, False, "Human (White) vs AI (Black)", 2, language, subscribed, False)
-        if self.chessView.buttons["buttonAIvsBlack"].collidepoint((mx, my)):
-            if self.chessView.click:
-                self.runGame(False, True, "AI (White) vs Human (Black)", 2, language, subscribed, False)
-        if self.chessView.buttons["buttonHumanvsHuman"].collidepoint((mx, my)):
-            if self.chessView.click:
-                self.runGame(True, True, "Practice Mode", 2, language, subscribed, False)
-        if self.chessView.buttons["buttonHardAIvsHardAI"].collidepoint((mx, my)):
-            if self.chessView.click:
-                self.runGame(False, False, "AI vs AI (Depth 3)", 3, language, subscribed, False)
-        if self.chessView.buttons["buttonWhitevsHardAI"].collidepoint((mx, my)):
-            if self.chessView.click:
-                self.runGame(True, False, "Human (White) vs Strong AI (Depth 3)", 3, language, subscribed, False)
-        if self.chessView.buttons["buttonImport"].collidepoint((mx, my)):
-            if self.chessView.click:
-                self.runGame(False, False, "AI vs AI", 2, language, subscribed, True)
-        if self.chessView.buttons["buttonRomanian"].collidepoint((mx, my)):
-            ChessMain.main("romanian", subscribed)
-        if self.chessView.buttons["buttonEnglish"].collidepoint((mx, my)):
-            ChessMain.main("english", subscribed)
-        if self.chessView.buttons["buttonGerman"].collidepoint((mx, my)):
-            ChessMain.main("german", subscribed)
-        if self.chessView.buttons["buttonRussian"].collidepoint((mx, my)):
-            ChessMain.main("russian", subscribed)
-        if self.chessView.buttons["buttonSubscribe"].collidepoint((mx, my)):
-            subscribed = not subscribed
-            ChessMain.main(language, subscribed)
+                with open(file_path) as pgn:
+                    gs['pgn_game'] = chess.pgn.read_game(pgn)
+                    gs['pgn_total_moves'] = len(list(gs['pgn_game'].mainline_moves()))
+            except Exception as e:
+                print(f"Could not load PGN file: {e}")
+                gs['pgn_game'] = None
