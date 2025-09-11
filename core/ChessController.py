@@ -91,7 +91,7 @@ class ChessController:
     def start_game_loop(self, playerOne, playerTwo, depth, language, subscribed, importGame):
         """Vòng lặp chính của ván cờ."""
         self.play_sound("ChessOpeningSound")
-        self.view.screen = p.display.set_mode((self.view.WIDTH + self.view.MOVE_LOG_WIDTH, self.view.HEIGHT))
+        self.view.screen = p.display.set_mode((self.view.WIDTH, self.view.HEIGHT))
 
         game_state = {
             'ai': ChessAI.ChessAI(depth),
