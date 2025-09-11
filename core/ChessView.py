@@ -33,6 +33,8 @@ class ChessView():
         # SỬA ĐỔI: Thêm ../ vào đường dẫn
         programIcon = p.image.load(r'../images/mychesslogo.png')
         p.display.set_icon(programIcon)
+        # SỬA LỖI: Thêm dòng này để tải hình ảnh quân cờ
+        self.loadBoard()
 
     def loadBoard(self):
         pieces = ['wP', 'wR', 'wN', 'wB', 'wK', 'wQ', 'bP', 'bR', 'bN', 'bB', 'bK', 'bQ']
@@ -151,7 +153,12 @@ class ChessView():
                         sys.exit()
                 if event.type == MOUSEBUTTONDOWN:
                     if event.button == 1:
-                            self.click = True
+                        # SỬA ĐỔI: Kiểm tra xem nút nào được nhấn và trả về tên của nó
+                        mx, my = p.mouse.get_pos()
+                        for button_name, rect in self.buttons.items():
+                            if rect.collidepoint((mx, my)):
+                                return button_name  # Trả về tên nút được nhấn
+                        self.click = True  # Giữ lại logic cũ nếu cần
 
             p.display.update()
             self.mainClock.tick(60)

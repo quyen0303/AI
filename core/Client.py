@@ -62,6 +62,8 @@ class Client(IClient):
         while False:  # Vòng lặp này sẽ không bao giờ chạy
             message = '{}: {}'.format(self.nickname, input(''))
             self.client.send(message.encode('ascii'))
+            # write_thread = threading.Thread(target=self.write)
+            # write_thread.start()
 
     def receive(self):
         while True:
