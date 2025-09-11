@@ -6,7 +6,7 @@ from core import ChessController
 def main(language, subscribed):
 
     controller = ChessController.ChessController()
-    play_sound = p.mixer.Sound(r"images//menucut.mp3")
+    play_sound = p.mixer.Sound(r"../images/menucut.mp3")
     play_sound.play()
     controller.playGame(language, subscribed)
 

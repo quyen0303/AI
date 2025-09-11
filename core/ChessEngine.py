@@ -397,7 +397,7 @@ class Move():
                 outString += self.getRankFile(self.startRow, self.startCol)[0] + "x" + self.getRankFile(
                     self.endRow, self.endCol)
             if self.play == 0:
-                captureSound = p.mixer.Sound(r"images/ChessCaptureSound.mp3")
+                captureSound = p.mixer.Sound(r"../images/ChessCaptureSound.mp3")
                 captureSound.play()
                 self.play = 1
             else:

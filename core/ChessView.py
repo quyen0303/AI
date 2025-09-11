@@ -30,13 +30,15 @@ class ChessView():
                         "buttonImport": p.Rect(466, 190, 40, 40)}
         self.mainClock = p.time.Clock()
         self.font = p.font.SysFont(r'couriernew', 15)
-        programIcon = p.image.load(r'images/mychesslogo.png')
+        # SỬA ĐỔI: Thêm ../ vào đường dẫn
+        programIcon = p.image.load(r'../images/mychesslogo.png')
         p.display.set_icon(programIcon)
 
     def loadBoard(self):
         pieces = ['wP', 'wR', 'wN', 'wB', 'wK', 'wQ', 'bP', 'bR', 'bN', 'bB', 'bK', 'bQ']
         for piece in pieces:
-            self.IMAGES[piece] = p.transform.scale(p.image.load("images/" + piece + ".png"), (self.SQUARE_SIZE, self.SQUARE_SIZE))
+            # SỬA ĐỔI: Thêm ../ vào đường dẫn
+            self.IMAGES[piece] = p.transform.scale(p.image.load("../images/" + piece + ".png"), (self.SQUARE_SIZE, self.SQUARE_SIZE))
 
     def drawBoard(self):
         global colors
@@ -65,6 +67,8 @@ class ChessView():
     def saveGame(self, movesList):
         result = movesList.pop()
         turnDictionary = {}
+        # Lưu ý: đường dẫn này có thể cần sửa thành '../core/last_game_logs.txt'
+        # nếu bạn chạy file từ thư mục gốc.
         file = open(r"core/last_game_logs.txt", "w")
         for i in range(0, len(movesList)):
             try:
@@ -85,14 +89,16 @@ class ChessView():
     def mainMenu(self, language, subscribed):
         while True and self.click == False:
             self.screen.fill(p.Color(235, 235, 208))
-            image = p.image.load(r"images/mychesslogo.png")
+            # SỬA ĐỔI: Thêm ../ vào đường dẫn
+            image = p.image.load(r"../images/mychesslogo.png")
             self.screen.blit(image, (216, 10))
 
             for button in self.buttons:
                 p.draw.rect(self.screen, p.Color(119, 148, 85), self.buttons[button])
 
             import xml.etree.ElementTree as ET
-            mytree = ET.parse(r"core//display.xml")
+            # Lưu ý: đường dẫn này có thể cần sửa tương tự
+            mytree = ET.parse(r"../core//display.xml")
             myroot = mytree.getroot()
 
             k = 2
@@ -126,12 +132,13 @@ class ChessView():
                             k = k + 1
 
             project_root = os.path.dirname(os.path.dirname(__file__))
-            self.screen.blit(p.image.load(r"images/romaniabutton.png"), (60, 20, 20, 40))
-            self.screen.blit(p.image.load(r"images/ukflag.png"), (120, 20, 80, 40))
-            self.screen.blit(p.image.load(r"images/germanyflag.png"), (60, 70, 40, 40))
-            self.screen.blit(p.image.load(r"images/rusflag.png"), (120, 70, 40, 40))
-            self.screen.blit(p.image.load(r"images/chessengine.png"), (466, 130, 40, 40))
-            self.screen.blit(p.image.load(r"images/importchessgame.png"), (466, 190, 40, 40))
+            # SỬA ĐỔI: Thêm ../ vào tất cả các đường dẫn hình ảnh
+            self.screen.blit(p.image.load(r"../images/romaniabutton.png"), (60, 20, 20, 40))
+            self.screen.blit(p.image.load(r"../images/ukflag.png"), (120, 20, 80, 40))
+            self.screen.blit(p.image.load(r"../images/germanyflag.png"), (60, 70, 40, 40))
+            self.screen.blit(p.image.load(r"../images/rusflag.png"), (120, 70, 40, 40))
+            self.screen.blit(p.image.load(r"../images/chessengine.png"), (466, 130, 40, 40))
+            self.screen.blit(p.image.load(r"../images/importchessgame.png"), (466, 190, 40, 40))
 
             self.click = False
             for event in p.event.get():

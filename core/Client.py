@@ -53,7 +53,7 @@ class Client(IClient):
 
     def playChess(self, language, subscribed):
         controller = ChessController.ChessController()
-        playSound = p.mixer.Sound(r"images/menucut.mp3")
+        playSound = p.mixer.Sound(r"../images/menucut.mp3")
         playSound.play()
         controller.playGame(language, subscribed)
 
