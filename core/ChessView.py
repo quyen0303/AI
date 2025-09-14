@@ -1,210 +1,241 @@
 # Import các thư viện cần thiết.
-import os  # Dùng để tương tác với hệ điều hành, không được sử dụng trực tiếp trong file này nhưng có thể hữu ích.
-
-import pygame as p  # Thư viện chính để xây dựng game và giao diện đồ họa.
-import sys  # Dùng để thoát chương trình một cách an toàn.
-from pygame.locals import *  # Import tất cả các hằng số của Pygame (ví dụ: QUIT, KEYDOWN).
+import os
+import pygame as p
+import sys
+from pygame.locals import *
+import xml.etree.ElementTree as ET
 
 
 # Lớp ChessView quản lý tất cả các hoạt động liên quan đến việc hiển thị.
 class ChessView():
-    # Hàm khởi tạo, thiết lập các thuộc tính ban đầu cho giao diện.
     def __init__(self):
-        p.init()  # Khởi tạo tất cả các module của Pygame, đây là bước bắt buộc.
-        # Định nghĩa các hằng số kích thước cho cửa sổ game và các thành phần khác.
-        self.WIDTH = self.HEIGHT = self.MOVE_LOG_HEIGHT = 512  # Chiều rộng và cao của bàn cờ.
-        self.MOVE_LOG_WIDTH = 280  # Chiều rộng khu vực hiển thị lịch sử nước đi.
-        self.EVAL_BAR_WIDTH = 50  # Chiều rộng thanh đánh giá.
-        self.n = 8  # Số ô trên mỗi hàng/cột của bàn cờ.
-        self.SQUARE_SIZE = self.HEIGHT // self.n  # Tính kích thước của một ô cờ.
-        self.FPS = 15  # Tốc độ khung hình mỗi giây cho game.
-        self.IMAGES = {}  # Từ điển để lưu trữ các hình ảnh quân cờ đã được tải.
-        self.screen = p.display.set_mode((self.WIDTH, self.HEIGHT))  # Tạo cửa sổ hiển thị chính.
-        self.click = False  # Một biến cờ (flag), không còn được sử dụng nhiều trong phiên bản đã tối ưu.
-        # Từ điển định nghĩa các vùng hình chữ nhật (Rect) cho tất cả các nút bấm trên menu.
-        # p.Rect(x, y, width, height)
-        self.buttons = {"buttonAIvsAI": p.Rect(56, 120, 400, 56),
-                        "buttonWhitevsAI": p.Rect(56, 180, 400, 56),
-                        "buttonAIvsBlack": p.Rect(56, 240, 400, 56),
-                        "buttonHumanvsHuman": p.Rect(56, 300, 400, 56),
-                        "buttonHardAIvsHardAI": p.Rect(56, 360, 400, 56),
-                        "buttonWhitevsHardAI": p.Rect(56, 420, 400, 56),
-                        "buttonRomanian": p.Rect(60, 20, 40, 40),
-                        "buttonEnglish": p.Rect(120, 20, 40, 40),
-                        "buttonGerman": p.Rect(60, 70, 40, 40),
-                        "buttonRussian": p.Rect(120, 70, 40, 40),
-                        "buttonSubscribe": p.Rect(466, 130, 40, 40),
-                        "buttonImport": p.Rect(466, 190, 40, 40)}
-        self.mainClock = p.time.Clock()  # Tạo đối tượng Clock để kiểm soát FPS.
-        self.font = p.font.SysFont(r'couriernew', 15)  # Tải font chữ mặc định cho menu.
-        # Tải hình ảnh logo của chương trình.
+        p.init()
+        # --- Kích thước ---
+        self.BOARD_WIDTH = self.BOARD_HEIGHT = 512
+        self.EVAL_BAR_WIDTH = 24
+        self.CHAT_WIDTH = 288
+        self.WIDTH = self.BOARD_WIDTH + self.EVAL_BAR_WIDTH + self.CHAT_WIDTH
+        self.HEIGHT = self.BOARD_HEIGHT
+
+        # --- Hằng số Bàn cờ ---
+        self.n = 8
+        self.SQUARE_SIZE = self.BOARD_HEIGHT // self.n
+        self.FPS = 60
+        self.IMAGES = {}
+
+        # --- Bảng màu Hiện đại ---
+        self.COLORS = {
+            'board_light': p.Color("#f0d9b5"), 'board_dark': p.Color("#b58863"),
+            'bg_main': p.Color("#2c2a28"), 'bg_chat': p.Color("#1e1d1c"),
+            'text_light': p.Color("#e0e0e0"), 'text_dark': p.Color("#3d3c3a"),
+            'accent': p.Color("#6c9d4b"), 'accent_hover': p.Color("#85b964"),
+            'accent_active': p.Color("#e67f22"),
+            'highlight_select': p.Color(255, 255, 0, 100),
+            # **MỚI:** Màu sắc mới cho chỉ báo nước đi
+            'highlight_normal': p.Color(120, 120, 120, 100),  # Xám trong suốt
+            'highlight_capture': p.Color(180, 0, 0, 120)  # Đỏ sẫm trong suốt
+        }
+
+        # --- Fonts ---
+        try:
+            self.font_button = p.font.SysFont("Helvetica", 22, bold=True)
+            self.chat_font = p.font.SysFont("Arial", 16)
+        except:
+            self.font_button = p.font.SysFont(None, 26, bold=True)
+            self.chat_font = p.font.SysFont(None, 18)
+
+        # --- Khởi tạo Cửa sổ & Layout ---
+        self.screen = p.display.set_mode((self.WIDTH, self.HEIGHT))
+        self.mainClock = p.time.Clock()
+        self.eval_bar_rect = p.Rect(self.BOARD_WIDTH, 0, self.EVAL_BAR_WIDTH, self.BOARD_HEIGHT)
+        chat_start_x = self.BOARD_WIDTH + self.EVAL_BAR_WIDTH
+        self.input_box = p.Rect(chat_start_x + 10, self.HEIGHT - 40, self.CHAT_WIDTH - 20, 32)
+        self.chat_area = p.Rect(chat_start_x + 10, 10, self.CHAT_WIDTH - 20, self.HEIGHT - 60)
+
+        # --- Tải Tài nguyên ---
         programIcon = p.image.load(r'../images/mychesslogo.png')
-        # Đặt icon cho cửa sổ chương trình.
         p.display.set_icon(programIcon)
-        # Gọi hàm để tải hình ảnh các quân cờ vào bộ nhớ.
         self.loadBoard()
 
-    # Hàm tải và xử lý hình ảnh các quân cờ.
     def loadBoard(self):
-        # Danh sách tên các tệp hình ảnh của quân cờ.
         pieces = ['wP', 'wR', 'wN', 'wB', 'wK', 'wQ', 'bP', 'bR', 'bN', 'bB', 'bK', 'bQ']
-        # Vòng lặp qua từng tên tệp.
         for piece in pieces:
-            # Tải hình ảnh, thay đổi kích thước cho vừa với một ô cờ, và lưu vào từ điển IMAGES.
-            self.IMAGES[piece] = p.transform.scale(p.image.load("../images/" + piece + ".png"),
-                                                   (self.SQUARE_SIZE, self.SQUARE_SIZE))
+            image_path = os.path.join(os.path.dirname(__file__), '..', 'images', f'{piece}.png')
+            self.IMAGES[piece] = p.transform.scale(p.image.load(image_path), (self.SQUARE_SIZE, self.SQUARE_SIZE))
 
-    # Hàm vẽ các ô vuông của bàn cờ.
-    def drawBoard(self):
-        global colors  # Khai báo biến toàn cục (không phải là cách làm tốt nhất, nhưng hoạt động).
-        # Định nghĩa hai màu cho các ô cờ.
-        colors = [p.Color(235, 235, 208), p.Color(119, 148, 85)]
-        # Vòng lặp lồng nhau để duyệt qua từng ô cờ.
-        for i in range(self.n):
-            for j in range(self.n):
-                # Sử dụng toán tử modulo để xen kẽ màu cho các ô (tạo họa tiết bàn cờ).
-                color = colors[((i + j) % 2)]
-                # Vẽ một hình chữ nhật (ô cờ) với màu đã chọn tại vị trí tương ứng.
+    def drawBoard(self, is_online_mode):
+        self.screen.fill(self.COLORS['bg_main'])
+
+        for r in range(self.n):
+            for c in range(self.n):
+                color = self.COLORS['board_light'] if (r + c) % 2 == 0 else self.COLORS['board_dark']
                 p.draw.rect(self.screen, color,
-                            p.Rect(j * self.SQUARE_SIZE, i * self.SQUARE_SIZE, self.SQUARE_SIZE, self.SQUARE_SIZE))
+                            p.Rect(c * self.SQUARE_SIZE, r * self.SQUARE_SIZE, self.SQUARE_SIZE, self.SQUARE_SIZE))
 
-    # Hàm vẽ các quân cờ lên bàn cờ.
+        if is_online_mode:
+            p.draw.rect(self.screen, p.Color("dark gray"), self.eval_bar_rect)
+            chat_bg_rect = p.Rect(self.BOARD_WIDTH + self.EVAL_BAR_WIDTH, 0, self.CHAT_WIDTH, self.HEIGHT)
+            p.draw.rect(self.screen, self.COLORS['bg_chat'], chat_bg_rect)
+
     def drawPieces(self, board):
-        # Vòng lặp lồng nhau để duyệt qua từng ô cờ.
-        for i in range(self.n):
-            for j in range(self.n):
-                # Lấy tên quân cờ từ mảng trạng thái bàn cờ (do Controller cung cấp).
-                piece = board[i][j]
-                # Nếu ô cờ không trống.
+        for r in range(self.n):
+            for c in range(self.n):
+                piece = board[r][c]
                 if piece != "--":
-                    # Vẽ (blit) hình ảnh quân cờ tương ứng từ từ điển IMAGES lên màn hình.
                     self.screen.blit(self.IMAGES[piece],
-                                     p.Rect(j * self.SQUARE_SIZE, i * self.SQUARE_SIZE, self.SQUARE_SIZE,
+                                     p.Rect(c * self.SQUARE_SIZE, r * self.SQUARE_SIZE, self.SQUARE_SIZE,
                                             self.SQUARE_SIZE))
 
-    # Hàm vẽ văn bản (ví dụ: thông báo kết thúc game) ra giữa màn hình.
+    # **HÀM ĐÃ ĐƯỢC NÂNG CẤP**
+    def highlightSquares(self, gs, valid_moves, sq_selected):
+        if sq_selected != ():
+            r, c = sq_selected
+            if 0 <= r < 8 and 0 <= c < 8 and gs.board[r][c][0] == ('w' if gs.whiteMoves else 'b'):
+                # 1. Tô màu ô được chọn
+                s = p.Surface((self.SQUARE_SIZE, self.SQUARE_SIZE), p.SRCALPHA)
+                s.fill(self.COLORS['highlight_select'])
+                self.screen.blit(s, (c * self.SQUARE_SIZE, r * self.SQUARE_SIZE))
+
+                # 2. Tạo các surface cho nước đi thường và ăn quân
+                s_normal = p.Surface((self.SQUARE_SIZE, self.SQUARE_SIZE), p.SRCALPHA)
+                s_normal.fill(self.COLORS['highlight_normal'])
+
+                s_capture = p.Surface((self.SQUARE_SIZE, self.SQUARE_SIZE), p.SRCALPHA)
+                s_capture.fill(self.COLORS['highlight_capture'])
+
+                # 3. Vẽ chỉ báo cho các nước đi hợp lệ
+                for move in valid_moves:
+                    if move.startRow == r and move.startCol == c:
+                        end_pos = (move.endCol * self.SQUARE_SIZE, move.endRow * self.SQUARE_SIZE)
+                        # Nếu là nước đi ăn quân, phủ màu đỏ
+                        if move.pieceCaptured != '--':
+                            self.screen.blit(s_capture, end_pos)
+                        # Nếu là nước đi thường, phủ màu xám
+                        else:
+                            self.screen.blit(s_normal, end_pos)
+
     def drawText(self, text):
-        font = p.font.SysFont("couriernew", 22, True, False)  # Tải font chữ lớn hơn.
-        textObject = font.render(text, False, p.Color("Black"))  # Tạo đối tượng văn bản màu đen.
-        # Tính toán vị trí để căn giữa văn bản trên màn hình.
-        textLocation = p.Rect(0, 0, self.WIDTH, self.HEIGHT).move(self.WIDTH / 2 - textObject.get_width() / 2,
-                                                                  self.HEIGHT / 2 - textObject.get_height() / 2)
-        # Vẽ văn bản màu đen.
-        self.screen.blit(textObject, textLocation)
-        # Tạo hiệu ứng đổ bóng bằng cách vẽ lại văn bản màu xám lệch đi một chút.
-        textObject = font.render(text, False, p.Color("Gray"))
-        self.screen.blit(textObject, textLocation.move(2, 2))
+        font = p.font.SysFont("Helvetica", 32, True, False)
+        text_object = font.render(text, True, self.COLORS['text_light'])
+        text_location = p.Rect(0, 0, self.BOARD_WIDTH, self.HEIGHT).move(
+            self.BOARD_WIDTH / 2 - text_object.get_width() / 2,
+            self.HEIGHT / 2 - text_object.get_height() / 2)
+        shadow = font.render(text, True, (0, 0, 0, 100))
+        self.screen.blit(shadow, text_location.move(2, 2))
+        self.screen.blit(text_object, text_location)
 
-    # Hàm lưu lịch sử ván cờ vào tệp.
-    def saveGame(self, movesList):
-        result = movesList.pop()  # Lấy kết quả ván cờ ra khỏi danh sách.
-        turnDictionary = {}  # Từ điển để tránh ghi trùng lặp.
-        # Mở tệp để ghi đè.
-        file = open(r"core/last_game_logs.txt", "w")
-        # Vòng lặp qua danh sách các nước đi.
-        for i in range(0, len(movesList)):
+    def drawChatUI(self, text, history, active):
+        color = self.COLORS['accent'] if active else self.COLORS['text_dark']
+        p.draw.rect(self.screen, self.COLORS['text_light'], self.input_box, border_radius=5)
+        p.draw.rect(self.screen, color, self.input_box, 2, border_radius=5)
+        text_surface = self.chat_font.render(text, True, self.COLORS['text_dark'])
+        self.screen.blit(text_surface, (self.input_box.x + 5, self.input_box.y + 5))
+        y = self.chat_area.bottom - 5
+        for line in reversed(history):
             try:
-                # Logic này có vẻ phức tạp và có thể không chính xác, mục đích là định dạng lại lịch sử.
-                if int(movesList[i][1]) not in turnDictionary:
-                    turnDictionary[movesList[i][1]] = movesList[i][1:] + "\n"
-                    file.write(movesList[i][1:] + "\n")
-            except:
-                pass  # Bỏ qua lỗi nếu có.
-        file.write(result)  # Ghi kết quả ở cuối tệp.
-        file.close()  # Đóng tệp.
-
-    # Hàm trợ giúp để vẽ văn bản cho menu tại một vị trí cụ thể.
-    def drawMenuText(self, text, color, x, y):
-        textobj = self.font.render(text, 1, color)  # Tạo đối tượng văn bản.
-        textrect = textobj.get_rect()  # Lấy vùng chữ nhật bao quanh văn bản.
-        textrect.topleft = (x, y)  # Đặt vị trí góc trên bên trái của văn bản.
-        self.screen.blit(textobj, textrect)  # Vẽ văn bản lên màn hình.
-
-    # Hàm vẽ và quản lý vòng lặp của menu chính.
-    def mainMenu(self, language, subscribed):
-        # Vòng lặp vô hạn, chỉ thoát khi người dùng click vào một nút (hàm sẽ return).
-        while True and self.click == False:
-            self.screen.fill(p.Color(235, 235, 208))  # Tô màu nền cho menu.
-            # Vẽ logo của game.
-            image = p.image.load(r"../images/mychesslogo.png")
-            self.screen.blit(image, (216, 10))
-
-            # Vẽ tất cả các hình chữ nhật nền cho các nút bấm.
-            for button in self.buttons:
-                p.draw.rect(self.screen, p.Color(119, 148, 85), self.buttons[button])
-
-            # Import thư viện XML để đọc văn bản đa ngôn ngữ.
-            import xml.etree.ElementTree as ET
-            # Phân tích cú pháp tệp display.xml.
-            mytree = ET.parse(r"../core//display.xml")
-            myroot = mytree.getroot()
-
-            k = 2  # Biến đếm để xác định vị trí y của các nút.
-            # Tìm thẻ tương ứng với ngôn ngữ đã chọn (ví dụ: <english>).
-            for x in myroot.findall(language):
-
-                # Lấy các chuỗi văn bản từ tệp XML.
-                restartText = x.find("restart").text
-                resignText = x.find("resign").text
-                undoText = x.find("undo").text
-                captionText = x.find("menutext").text
-                engineText = x.find("enginetext").text
-
-                # Đặt tiêu đề cho cửa sổ game.
-                p.display.set_caption(captionText)
-
-                # Vẽ các văn bản hướng dẫn (R, S, Z).
-                self.drawMenuText(restartText, p.Color("black"), 308, 20)
-                self.drawMenuText(resignText, p.Color("black"), 308, 40)
-                self.drawMenuText(undoText, p.Color("black"), 308, 60)
-
-                # Nếu người dùng đã đăng ký, hiển thị văn bản "Evaluate moves".
-                if subscribed:
-                    self.drawMenuText(engineText, p.Color("black"), 308, 100)
-
-                # Vòng lặp qua tất cả các thẻ con trong thẻ ngôn ngữ.
-                for i in x.iter():
-                    font = p.font.SysFont("couriernew", 22, True, False)  # Font lớn hơn cho nút.
-                    textObject = font.render(i.text, False, p.Color("Black"))
-
-                    # Lọc ra chỉ các thẻ văn bản dành cho các nút chế độ chơi.
-                    if i.text != x.find("aivai").text and i.text != x.find("whitevsai").text and \
-                            i.text != x.find("blackvsai").text and i.text != x.find("practice").text and \
-                            i.text != x.find("aivsai2").text and i.text != x.find("whitevsai2").text:
-                        pass  # Bỏ qua các thẻ không phải nút.
+                words = line.split(' ')
+                current_line = ""
+                lines_to_render = []
+                for word in words:
+                    test_line = current_line + word + " "
+                    if self.chat_font.size(test_line)[0] < self.chat_area.width - 10:
+                        current_line = test_line
                     else:
-                        # Tính toán tọa độ để căn giữa văn bản bên trong nút.
-                        self.drawMenuText(i.text, p.Color("black"), 56 + (abs(512 - textObject.get_width())) / 2,
-                                          56 / 2 + 60 * k)
-                        k = k + 1  # Tăng biến đếm để vẽ nút tiếp theo ở vị trí thấp hơn.
+                        lines_to_render.append(current_line)
+                        current_line = word + " "
+                lines_to_render.append(current_line)
 
-            # Vẽ các hình ảnh icon (cờ, engine, import) lên trên các nút.
-            self.screen.blit(p.image.load(r"../images/romaniabutton.png"), (60, 20, 20, 40))
-            self.screen.blit(p.image.load(r"../images/ukflag.png"), (120, 20, 80, 40))
-            self.screen.blit(p.image.load(r"../images/germanyflag.png"), (60, 70, 40, 40))
-            self.screen.blit(p.image.load(r"../images/rusflag.png"), (120, 70, 40, 40))
-            self.screen.blit(p.image.load(r"../images/chessengine.png"), (466, 130, 40, 40))
-            self.screen.blit(p.image.load(r"../images/importchessgame.png"), (466, 190, 40, 40))
+                for l in reversed(lines_to_render):
+                    line_surface = self.chat_font.render(l, True, self.COLORS['text_light'])
+                    y -= line_surface.get_height()
+                    self.screen.blit(line_surface, (self.chat_area.x + 5, y))
+                    if y < self.chat_area.top: break
+                if y < self.chat_area.top: break
+            except Exception as e:
+                print(f"Error rendering chat line: {e}")
 
-            self.click = False
-            # Bắt đầu vòng lặp xử lý sự kiện cho menu.
+    def drawEvaluationBar(self, score):
+        max_score = 1000
+        eval_normalized = max(min(score / max_score, 1), -1)
+        white_advantage_height = self.BOARD_HEIGHT / 2 * (1 - eval_normalized)
+        black_rect = p.Rect(self.eval_bar_rect.x, self.eval_bar_rect.y, self.EVAL_BAR_WIDTH, white_advantage_height)
+        p.draw.rect(self.screen, self.COLORS['text_dark'], black_rect)
+        white_rect = p.Rect(self.eval_bar_rect.x, self.eval_bar_rect.y + white_advantage_height, self.EVAL_BAR_WIDTH,
+                            self.BOARD_HEIGHT - white_advantage_height)
+        p.draw.rect(self.screen, self.COLORS['text_light'], white_rect)
+
+    def draw_menu_button(self, rect, text, mouse_pos):
+        is_hovered = rect.collidepoint(mouse_pos)
+        color = self.COLORS['accent_hover'] if is_hovered else self.COLORS['accent']
+        p.draw.rect(self.screen, (0, 0, 0, 50), rect.move(3, 3), border_radius=12)
+        p.draw.rect(self.screen, color, rect, border_radius=12)
+        text_surf = self.font_button.render(text, True, self.COLORS['text_light'])
+        text_rect = text_surf.get_rect(center=rect.center)
+        self.screen.blit(text_surf, text_rect)
+
+    def mainMenu(self, language, subscribed):
+        self.screen = p.display.set_mode((self.BOARD_WIDTH, self.BOARD_HEIGHT))
+
+        xml_path = os.path.join(os.path.dirname(__file__), 'display.xml')
+        try:
+            mytree = ET.parse(xml_path)
+            myroot = mytree.getroot()
+            lang_data = myroot.find(language)
+        except (FileNotFoundError, ET.ParseError):
+            print("Không thể tải tệp ngôn ngữ, sử dụng tiếng Anh mặc định.")
+            xml_fallback = "<english><aivai>AI vs AI</aivai><whitevsai>Play vs AI (White)</whitevsai><blackvsai>Play vs AI (Black)</blackvsai><practice>Practice</practice><aivsai2>Strong AI vs AI</aivsai2><whitevsai2>Play vs Strong AI</whitevsai2></english>"
+            lang_data = ET.fromstring(xml_fallback)
+
+        menu_items = {
+            "buttonAIvsAI": lang_data.find("aivai").text, "buttonWhitevsAI": lang_data.find("whitevsai").text,
+            "buttonAIvsBlack": lang_data.find("blackvsai").text, "buttonHumanvsHuman": lang_data.find("practice").text,
+            "buttonHardAIvsHardAI": lang_data.find("aivsai2").text,
+            "buttonWhitevsHardAI": lang_data.find("whitevsai2").text
+        }
+
+        button_rects = {}
+        y_start = 120
+        for i, key in enumerate(menu_items.keys()):
+            button_rects[key] = p.Rect(56, y_start + i * 60, 400, 50)
+
+        icon_buttons = {
+            "buttonSubscribe": (
+                p.image.load(os.path.join(os.path.dirname(__file__), '..', 'images', 'chessengine.png')),
+                p.Rect(self.BOARD_WIDTH - 50, 10, 40, 40)),
+            "buttonImport": (
+                p.image.load(os.path.join(os.path.dirname(__file__), '..', 'images', 'importchessgame.png')),
+                p.Rect(self.BOARD_WIDTH - 50, 60, 40, 40)),
+        }
+
+        while True:
+            self.screen.fill(self.COLORS['bg_main'])
+            mouse_pos = p.mouse.get_pos()
+
+            logo_path = os.path.join(os.path.dirname(__file__), '..', 'images', 'mychesslogo.png')
+            logo = p.image.load(logo_path)
+            self.screen.blit(logo, logo.get_rect(center=(self.BOARD_WIDTH / 2, 60)))
+
+            for key, text in menu_items.items():
+                self.draw_menu_button(button_rects[key], text, mouse_pos)
+
+            for key, (img, rect) in icon_buttons.items():
+                is_hovered = rect.collidepoint(mouse_pos)
+                is_active = (key == "buttonSubscribe" and subscribed)
+
+                if is_active:
+                    bg_color = self.COLORS['accent_active']
+                else:
+                    bg_color = self.COLORS['accent_hover'] if is_hovered else self.COLORS['accent']
+                p.draw.rect(self.screen, bg_color, rect, border_radius=5)
+                self.screen.blit(img, rect)
+
             for event in p.event.get():
-                if event.type == QUIT:  # Nếu người dùng nhấn nút X.
-                    p.quit()
-                    sys.exit()
-                if event.type == KEYDOWN:  # Nếu người dùng nhấn một phím.
-                    if event.key == K_ESCAPE:  # Nếu là phím ESC.
-                        p.quit()
-                        sys.exit()
-                if event.type == MOUSEBUTTONDOWN:  # Nếu người dùng click chuột.
-                    if event.button == 1:  # Nếu là chuột trái.
-                        mx, my = p.mouse.get_pos()  # Lấy tọa độ chuột.
-                        # Vòng lặp qua từ điển các nút đã định nghĩa.
-                        for button_name, rect in self.buttons.items():
-                            # Kiểm tra xem tọa độ chuột có nằm trong vùng của nút không.
-                            if rect.collidepoint((mx, my)):
-                                return button_name  # **QUAN TRỌNG**: Trả về tên của nút được click, thoát khỏi vòng lặp và hàm.
-                        self.click = True  # Logic cũ, ít được sử dụng.
+                if event.type == QUIT: p.quit(); sys.exit()
+                if event.type == MOUSEBUTTONDOWN and event.button == 1:
+                    for key, rect in button_rects.items():
+                        if rect.collidepoint(mouse_pos): return key
+                    for key, (_, rect) in icon_buttons.items():
+                        if rect.collidepoint(mouse_pos): return key
 
-            p.display.update()  # Cập nhật toàn bộ màn hình để hiển thị các thay đổi.
-            self.mainClock.tick(60)  # Giới hạn vòng lặp chạy ở 60 FPS để menu mượt mà.
+            p.display.update()
+            self.mainClock.tick(self.FPS)
