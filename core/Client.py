@@ -6,6 +6,7 @@ from abc import ABCMeta
 import datetime
 from collections import deque
 from core import ChessController
+import os # <-- THÊM DÒNG NÀY
 
 # --- Cấu hình mạng cho Client ---
 PORT = 5050
@@ -64,9 +65,11 @@ class Client(IClient):
 # Lớp ProxyClient
 class ProxyClient(IClient):
     def __init__(self):
+        # --- THAY ĐỔI: Tạo đường dẫn tệp chính xác ---
+        self.log_file_path = os.path.join(os.path.dirname(__file__), 'client_chat.txt')
         self.real_client = Client()
         try:
-            with open(r"core/client_chat.txt", "w") as file:
+            with open(self.log_file_path, "w") as file:
                 file.truncate(0)
         except IOError:
             print("Could not clear chat log file.")
@@ -82,7 +85,8 @@ class ProxyClient(IClient):
     def send_chat_message(self, msg):
         """Gửi tin nhắn chat và ghi log."""
         try:
-            with open(r"core/client_chat.txt", "a") as f:
+            # --- THAY ĐỔI: Sử dụng đường dẫn đã tạo ---
+            with open(self.log_file_path, "a") as f:
                 log_message = f'{self.real_client.nickname}: {msg}'
                 f.write(log_message + " %s \n" % (datetime.datetime.now()))
         except IOError as e:

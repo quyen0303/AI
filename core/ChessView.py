@@ -205,6 +205,19 @@ class ChessView():
             "buttonImport": (
                 p.image.load(os.path.join(os.path.dirname(__file__), '..', 'images', 'importchessgame.png')),
                 p.Rect(self.BOARD_WIDTH - 50, 60, 40, 40)),
+            # --- PHẦN MÃ MỚI ĐƯỢC THÊM VÀO ---
+            "buttonRomanian": (
+                p.image.load(os.path.join(os.path.dirname(__file__), '..', 'images', 'romaniabutton.png')),
+                p.Rect(10, 10, 40, 40)),
+            "buttonEnglish": (
+                p.image.load(os.path.join(os.path.dirname(__file__), '..', 'images', 'ukflag.png')),
+                p.Rect(60, 10, 40, 40)),
+            "buttonGerman": (
+                p.image.load(os.path.join(os.path.dirname(__file__), '..', 'images', 'germanyflag.png')),
+                p.Rect(10, 60, 40, 40)),
+            "buttonRussian": (
+                p.image.load(os.path.join(os.path.dirname(__file__), '..', 'images', 'rusflag.png')),
+                p.Rect(60, 60, 40, 40)),
         }
 
         while True:
@@ -239,3 +252,89 @@ class ChessView():
 
             p.display.update()
             self.mainClock.tick(self.FPS)
+
+
+    def drawMoveHistoryPanel(self, move_history, is_online_mode=False, chat_text="", chat_history=None,
+                                 chat_active=False):
+            """
+            Vẽ bảng điều khiển bên phải, hiển thị lịch sử nước đi.
+            Nếu ở chế độ online, sẽ hiển thị thêm cả phòng chat.
+            """
+            if chat_history is None:
+                chat_history = []
+
+            panel_start_x = self.BOARD_WIDTH + self.EVAL_BAR_WIDTH
+            panel_rect = p.Rect(panel_start_x, 0, self.CHAT_WIDTH, self.HEIGHT)
+            p.draw.rect(self.screen, self.COLORS['bg_chat'], panel_rect)
+
+            # --- Thiết lập khu vực vẽ ---
+            history_area_height_ratio = 0.45 if is_online_mode else 1.0  # Chiếm toàn bộ nếu offline
+            history_area = p.Rect(panel_start_x + 10, 10, self.CHAT_WIDTH - 20,
+                                  self.HEIGHT * history_area_height_ratio - 20)
+
+            # --- Logic vẽ Lịch sử nước đi (chung cho cả 2 chế độ) ---
+            full_log_string = ""
+            for i in range(len(move_history)):
+                if i % 2 == 0:
+                    full_log_string += f"{i // 2 + 1}. {move_history[i].getChessNotation()} "
+                else:
+                    full_log_string += f"{move_history[i].getChessNotation()} "
+
+            words = full_log_string.split(' ')
+            lines_to_render = []
+            current_line = ""
+            for word in words:
+                if not word: continue
+                test_line = current_line + word + " "
+                if self.chat_font.size(test_line)[0] < history_area.width:
+                    current_line = test_line
+                else:
+                    lines_to_render.append(current_line)
+                    current_line = word + " "
+            lines_to_render.append(current_line)
+
+            y = history_area.y
+            line_height = self.chat_font.get_height()
+            for line in lines_to_render:
+                if y < history_area.bottom - line_height:
+                    line_surface = self.chat_font.render(line, True, self.COLORS['text_light'])
+                    self.screen.blit(line_surface, (history_area.x, y))
+                    y += line_height
+                else:
+                    break
+
+            # --- Logic vẽ Phòng Chat (chỉ dành cho chế độ online) ---
+            if is_online_mode:
+                chat_history_area = p.Rect(panel_start_x + 10, history_area.bottom + 10, self.CHAT_WIDTH - 20,
+                                           self.HEIGHT * 0.55 - 50)
+
+                y_chat = chat_history_area.bottom - 5
+                for line in reversed(chat_history):
+                    try:
+                        words_chat = line.split(' ')
+                        current_line_chat = ""
+                        lines_to_render_chat = []
+                        for word_chat in words_chat:
+                            test_line_chat = current_line_chat + word_chat + " "
+                            if self.chat_font.size(test_line_chat)[0] < chat_history_area.width:
+                                current_line_chat = test_line_chat
+                            else:
+                                lines_to_render_chat.append(current_line_chat)
+                                current_line_chat = word_chat + " "
+                        lines_to_render_chat.append(current_line_chat)
+
+                        for l_chat in reversed(lines_to_render_chat):
+                            line_surface_chat = self.chat_font.render(l_chat, True, self.COLORS['text_light'])
+                            y_chat -= line_surface_chat.get_height()
+                            if y_chat < chat_history_area.top: break
+                            self.screen.blit(line_surface_chat, (chat_history_area.x + 5, y_chat))
+                        if y_chat < chat_history_area.top: break
+                    except Exception as e:
+                        print(f"Error rendering chat line: {e}")
+
+                # Vẽ Hộp nhập liệu Chat
+                color = self.COLORS['accent'] if chat_active else self.COLORS['text_dark']
+                p.draw.rect(self.screen, self.COLORS['text_light'], self.input_box, border_radius=5)
+                p.draw.rect(self.screen, color, self.input_box, 2, border_radius=5)
+                text_surface = self.chat_font.render(chat_text, True, self.COLORS['text_dark'])
+                self.screen.blit(text_surface, (self.input_box.x + 5, self.input_box.y + 5))
