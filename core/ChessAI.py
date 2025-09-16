@@ -9,7 +9,7 @@ class ChessAI():
     # Hàm khởi tạo, thiết lập các bảng điểm và độ sâu tìm kiếm.
     def __init__(self, depth):
         # TỐI ƯU HÓA: Điểm số quân cờ được nhân với 100 để làm việc với số nguyên, tránh lỗi làm tròn của số thực.
-        self.pieceScore = {"K": 0, "Q": 900, "R": 500, "B": 330, "N": 320, "P": 100}
+        self.pieceScore = {"K": 0, "Q": 900, "R": 500, "B": 330, "P": 100}
 
         # Bảng điểm vị trí cho Mã (Knight). Mã ở trung tâm mạnh hơn ở biên.
         self.knightScores = [[1, 1, 1, 1, 1, 1, 1, 1],
